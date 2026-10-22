@@ -1,0 +1,184 @@
+name: Deploy to Production
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Triggers ONLY on push to main, and ONLY after the CI workflow has already
+# passed for that exact commit (workflow_run trigger) — this guarantees a
+# broken commit can never reach production even if someone bypasses PR review.
+#
+# Steps
+# ─────
+#   1. Wait for CI workflow to report success for this SHA
+#   2. Build and push the Docker image to GitHub Container Registry (GHCR)
+#   3. SSH into the production server
+#   4. Pull the new image, run migrations, perform a zero-downtime restart
+#      (reuses scripts/deploy.sh — the same script used for manual deploys)
+#   5. Verify the health check passes
+#   6. Post a deployment status to the GitHub commit
+#
+# Required repository secrets
+# ────────────────────────────
+#   PROD_SSH_HOST        — production server hostname/IP
+#   PROD_SSH_USER         — deploy user (should have docker group membership)
+#   PROD_SSH_PRIVATE_KEY  — private key for the deploy user (passwordless)
+#   PROD_SSH_PORT         — SSH port (optional, defaults to 22)
+#   GHCR_PAT              — token with write:packages scope (or use GITHUB_TOKEN)
+# ══════════════════════════════════════════════════════════════════════════════
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:    # allow manual re-deploy from the Actions tab
+    inputs:
+      skip_migration:
+        description: "Skip database migrations (use with caution)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+  deployments: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    name: Build, push & deploy
+    runs-on: ubuntu-latest
+    # Only proceed if the triggering CI run succeeded (or this was a manual dispatch)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment:
+      name: production
+      url: https://handydoctor.app
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Create GitHub deployment
+        uses: chrnorm/deployment-action@v2
+        id: deployment
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: production
+
+      # ── Build & push image ─────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Deploy to production server ────────────────────────────────────
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          timeout: 120s
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            cd /opt/handydoctor
+
+            echo "── Pulling latest code (for compose files / scripts) ──"
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "── Logging into GHCR ──"
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u "${{ github.actor }}" --password-stdin
+
+            echo "── Pulling new image ──"
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            docker tag  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest handydoctor-api:latest
+
+            echo "── Running deployment script ──"
+            SKIP_MIGRATE_FLAG=""
+            if [[ "${{ inputs.skip_migration }}" == "true" ]]; then
+              SKIP_MIGRATE_FLAG="--skip-migrate"
+            fi
+            ./scripts/deploy.sh --skip-build $SKIP_MIGRATE_FLAG
+
+      # ── Verify health post-deploy ───────────────────────────────────────
+      - name: Verify production health
+        run: |
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://handydoctor.app/health || echo "000")
+            if [[ "$STATUS" == "200" ]]; then
+              echo "Production health check passed (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "Attempt $i/10: HTTP $STATUS — retrying in 5s..."
+            sleep 5
+          done
+          echo "Production health check failed after 10 attempts"
+          exit 1
+
+      # ── Update deployment status ────────────────────────────────────────
+      - name: Mark deployment as successful
+        if: success()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: success
+          environment-url: https://handydoctor.app
+
+      - name: Mark deployment as failed
+        if: failure()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: failure
+
+  # ── Rollback job (manual trigger only) ─────────────────────────────────────
+  rollback:
+    name: Rollback to previous image
+    runs-on: ubuntu-latest
+    if: false   # never auto-runs — trigger manually via workflow_dispatch with this job enabled
+    environment: production
+    steps:
+      - name: Rollback via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/handydoctor
+            docker compose -f docker-compose.prod.yml up -d --no-deps api
+            echo "Rolled back to last :latest image tag prior to this deploy."

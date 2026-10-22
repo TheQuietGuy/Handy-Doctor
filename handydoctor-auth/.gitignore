@@ -1,0 +1,57 @@
+# ── Secrets & keys (NEVER commit) ─────────────────────────────────────────────
+private.pem
+*.key
+*.p12
+*.pfx
+
+# ── Environment files ──────────────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+# .env.example files ARE committed — they document required variables
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+nosetests.xml
+junit.xml
+
+# ── Alembic runtime ───────────────────────────────────────────────────────────
+# Do NOT ignore migrations/versions/ — those are source-controlled
+# Ignore only the compiled/cache files
+migrations/__pycache__/
+migrations/versions/__pycache__/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# docker-compose.override.yml is gitignored by convention (local overrides)
+docker-compose.override.yml
+
+# ── OS & editors ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml

@@ -1,0 +1,110 @@
+[project]
+name = "handydoctor-api"
+version = "1.0.0"
+description = "HandyDoctor — AI-powered medical triage API"
+requires-python = ">=3.12"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Ruff — linting and formatting
+# ══════════════════════════════════════════════════════════════════════════════
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+    "migrations/versions",   # auto-generated, not worth linting
+    "__pycache__",
+    ".venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort (import sorting)
+    "B",      # flake8-bugbear (likely bugs)
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade (modern syntax)
+    "ASYNC",  # flake8-async (async/await correctness)
+    "S",      # flake8-bandit (security) — important for an auth/medical app
+]
+ignore = [
+    "E501",    # line length handled by formatter, not linter
+    "S101",    # assert is fine in tests
+    "B008",    # FastAPI's Depends() in default args is idiomatic
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*"               = ["S101", "S106", "S105", "S107"]  # asserts/passwords expected in tests
+"tests/test_ingest.py"  = ["S101", "S106", "S105", "S107", "E402"]  # sys.path.insert precedes imports by design
+"scripts/ingest/*"      = ["S310"]                          # urllib used intentionally for fetching
+"scripts/ingest/run.py" = ["E402"]                           # sys.path.insert precedes imports by design
+"app/auth/jwt.py"       = ["S105"]                            # "access"/"refresh" string literals, not secrets
+"app/schemas.py"        = ["S105"]                            # token_type="bearer" is a protocol constant, not a secret
+"app/config.py"         = ["S105"]                            # field name "secret_key", not a literal secret value
+"app/audit.py"          = ["S105"]                            # enum value name "password_changed", not a secret
+"app/auth/oauth.py"     = ["S105"]                            # GOOGLE_TOKEN_URL constant name, not a secret
+"app/notifications/builder.py" = ["S112"]                     # citation parse failures are non-critical, safe to skip silently
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "scripts"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# mypy — static type checking
+# ══════════════════════════════════════════════════════════════════════════════
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false   # advisory mode — tighten incrementally
+ignore_missing_imports = true
+exclude = ["migrations/versions/", "tests/"]
+
+[[tool.mypy.overrides]]
+module = "scripts.ingest.*"
+ignore_errors = true   # optional dependencies (chromadb, openai) not always installed
+
+# ══════════════════════════════════════════════════════════════════════════════
+# pytest
+# ══════════════════════════════════════════════════════════════════════════════
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+filterwarnings = [
+    "ignore::DeprecationWarning:passlib.*",
+    "ignore::ResourceWarning",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests that require external services",
+]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Coverage
+# ══════════════════════════════════════════════════════════════════════════════
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/__pycache__/*",
+]
+branch = true
+
+[tool.coverage.report]
+precision = 1
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
