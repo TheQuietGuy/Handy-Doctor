@@ -35,8 +35,11 @@ Leave key unset → MockGenerator (deterministic, no external calls).
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 
+from app.chat.ai import care
+from app.chat.ai.redflags import evaluate as evaluate_red_flags
 from app.chat.ai.retrieval import BaseRetriever, Chunk, MockRetriever
 from app.chat.ai.triage import classify_query, classify_response
 
@@ -48,8 +51,8 @@ You are HandyDoctor, a medical triage assistant grounded in NHS, WHO, and NICE g
 RULES:
 1. Base all advice ONLY on the retrieved guideline context provided below.
 2. Be clear, concise, and empathetic. Avoid jargon.
-3. Always include a triage recommendation: self-care, see a GP, or call 999.
-4. Never diagnose. Always recommend professional review for anything beyond mild self-limiting symptoms.
+3. Always end with ONE next step: self-care at home, ask a pharmacist, contact a GP, get help today (NHS 111 / urgent treatment centre), or call 999.
+4. Never diagnose or name a likely condition; describe what to do and which warning signs mean getting help sooner. Always recommend professional review for anything beyond mild self-limiting symptoms.
 5. End every response with: "⚕️ This is not a substitute for professional medical advice."
 
 RETRIEVED GUIDELINE CONTEXT:
@@ -74,15 +77,62 @@ _CRISIS_RESPONSE = (
     "⚕️ This is not a substitute for professional medical advice."
 )
 
-_CRISIS_TERMS = {"suicidal", "self-harm", "want to die", "kill myself"}
+_CRISIS_TERMS = {
+    "suicidal", "suicide", "self-harm", "self harm", "harm myself", "hurt myself",
+    "want to die", "wanna die", "kill myself", "killing myself", "end my life",
+    "end it all", "take my own life", "take my life", "better off dead",
+    "no reason to live", "don't want to be alive", "do not want to be alive",
+    "don't want to live", "do not want to live", "overdose on purpose",
+}
+
+
+_CRISIS_RE = re.compile(
+    r"\b(end(ing)?|take|taking) (my|his|her|their) (own )?li(fe|ves)\b"
+    r"|\b(kill|killing|hurt|hurting|harm|harming|cut|cutting) (my|him|her|them)sel(f|ves)\b"
+    r"|\bsuicid\w*|\b(don'?t|do not) want to (be alive|live|wake up)"
+    r"|\bbetter off (dead|without me)|\bno (point|reason) (in )?(living|to live)"
+)
 
 
 @dataclass
 class AIResponse:
     content: str
-    severity: str  # 'green' | 'amber' | 'red'
+    severity: str  # 'green' | 'amber' | 'red'  (kept for older clients / emails)
     citations: list[Chunk] = field(default_factory=list)
     is_emergency: bool = False
+    care_level: str = "self_care"  # see app/chat/ai/care.py
+    reasons: list[dict] = field(default_factory=list)  # why this level (rule hits)
+
+
+_WHO = {"me": "the user", "child": "the user's child", "other": "someone the user is asking about"}
+_DURATION = {
+    "today": "started today", "1_3_days": "1 to 3 days", "4_7_days": "4 to 7 days",
+    "1_3_weeks": "1 to 3 weeks", "over_3_weeks": "more than 3 weeks",
+}
+
+
+def context_summary(ctx: dict | None) -> str:
+    """Plain-English summary of the interview answers, for the prompt and GP summary."""
+    if not ctx:
+        return ""
+    from app.chat.ai.interview import QUESTIONS
+
+    parts = [f"Patient: {_WHO.get(ctx.get('who', 'me'), 'the user')}"]
+    if ctx.get("age_years") not in (None, ""):
+        parts.append(f"age {ctx['age_years']}")
+    if ctx.get("duration"):
+        parts.append(f"duration {_DURATION.get(ctx['duration'], ctx['duration'])}")
+    if ctx.get("severity"):
+        parts.append(f"self-rated severity {ctx['severity']}")
+    flags = ctx.get("red_flags") or {}
+    yes = [QUESTIONS[q].text for q, v in flags.items() if v is True and q in QUESTIONS]
+    no = [QUESTIONS[q].text for q, v in flags.items() if v is False and q in QUESTIONS]
+    out = ", ".join(parts) + "."
+    if yes:
+        out += " Answered YES to: " + " ".join(yes)
+    if no:
+        out += " Answered NO to: " + " ".join(no)
+    return out
 
 
 # ── Pipeline entry point ──────────────────────────────────────────────────────
@@ -90,6 +140,7 @@ async def run_pipeline(
     query: str,
     history: list[dict],  # [{"role": "user"|"assistant", "content": "…"}, …]
     retriever: BaseRetriever | None = None,
+    context: dict | None = None,  # guided-interview answers (who/age/duration/red_flags)
 ) -> AIResponse:
     """
     Main RAG pipeline.  All steps are instrumented with logging so the
@@ -98,15 +149,30 @@ async def run_pipeline(
     retriever = retriever or MockRetriever()
 
     # ── 1. Emergency pre-check ────────────────────────────────────────────
-    lower = query.lower()
-    if any(t in lower for t in _CRISIS_TERMS):
+    lower = query.lower().replace("’", "'")
+    if any(t in lower for t in _CRISIS_TERMS) or _CRISIS_RE.search(lower):
         logger.info("pipeline: crisis keywords detected, short-circuiting")
-        return AIResponse(content=_CRISIS_RESPONSE, severity="red", is_emergency=True)
+        return AIResponse(
+            content=_CRISIS_RESPONSE, severity="red", is_emergency=True, care_level="emergency",
+            reasons=[{"id": "crisis", "level": "emergency", "source": "NHS: Help for suicidal thoughts",
+                      "reason": "You mentioned thoughts of ending your life or harming yourself."}],
+        )
 
-    emergency_severity = classify_query(query)
-    if emergency_severity == "red":
-        logger.info("pipeline: emergency keywords detected, short-circuiting")
-        return AIResponse(content=_EMERGENCY_RESPONSE, severity="red", is_emergency=True)
+    # Deterministic red-flag rules over everything the user has said in this check.
+    earlier = " ".join(m["content"] for m in history if m.get("role") == "user")
+    rules = evaluate_red_flags(f"{earlier} {query}", context)
+    if (context or {}).get("red_flags", {}).get("mood_safety") is True:
+        return AIResponse(
+            content=_CRISIS_RESPONSE, severity="red", is_emergency=True, care_level="emergency",
+            reasons=rules.reasons,
+        )
+
+    if classify_query(query) == "red" or rules.level == "emergency":
+        logger.info("pipeline: emergency detected (rules=%s), short-circuiting", rules.level)
+        reasons = rules.reasons or [{"id": "keywords", "level": "emergency", "source": "NHS: When to call 999",
+                                     "reason": "You described symptoms that can be a medical emergency."}]
+        return AIResponse(content=_EMERGENCY_RESPONSE, severity="red", is_emergency=True,
+                          care_level="emergency", reasons=reasons)
 
     # ── 2. Retrieval ──────────────────────────────────────────────────────
     logger.debug("pipeline: retrieving for query=%r", query[:80])
@@ -114,25 +180,59 @@ async def run_pipeline(
     logger.debug("pipeline: retrieved %d chunks", len(chunks))
 
     # ── 3. Generate ───────────────────────────────────────────────────────
-    content = await _generate(query, chunks, history)
+    content = await _generate(query, chunks, history, context_summary(context))
+    content = child_safe(content, context)
 
-    # ── 4. Classify severity ──────────────────────────────────────────────
-    severity = classify_response(content)
-    logger.debug("pipeline: severity=%s", severity)
+    # ── 4. Classify, then apply the rule floor (rules can only raise) ────
+    body = content.split("⚕️")[0]  # the standard disclaimer footer mentions GP/111 on every answer
+    model_level = care.from_response_text(body, classify_response(body))
+    final = care.highest(model_level, rules.level)
+    if care.rank(final) > care.rank(model_level):
+        lv = care.LEVELS[final]
+        why = " ".join(r["reason"] for r in rules.reasons if r["level"] == final)
+        content = f"**{lv.label}.** {why} {lv.action}\n\n{content}"
+    logger.debug("pipeline: model=%s rules=%s final=%s", model_level, rules.level, final)
 
-    return AIResponse(content=content, severity=severity, citations=chunks)
+    return AIResponse(content=content, severity=care.severity_of(final), citations=chunks,
+                      care_level=final, reasons=rules.reasons)
+
+
+# ── Child safety: no adult doses in answers about children ────────────────
+_DOSE = re.compile(r"\d+(\.\d+)?\s*(?:[–-]|to)?\s*\d*\s*(mg|mcg|ml|g/day|grams?)\b", re.I)
+_CHILD_NOTE = (
+    "Medicine doses for children depend on their age and weight. Check the packet or ask a "
+    "pharmacist before giving anything, and never give aspirin to under-16s."
+)
+
+
+def child_safe(content: str, context: dict | None) -> str:
+    """Remove adult-dose sentences when the check is about a child (under 16)."""
+    if not context:
+        return content
+    age = context.get("age_years")
+    is_child = context.get("who") == "child" or (isinstance(age, (int, float)) and age < 16)
+    if not is_child or not _DOSE.search(content):
+        return content
+    kept = []
+    for para in content.split("\n"):
+        sentences = re.split(r"(?<=[.!?])\s+", para)
+        kept.append(" ".join(x for x in sentences if not _DOSE.search(x)))
+    out = "\n".join(kept).replace("\n\n\n", "\n\n")
+    main, sep, footer = out.partition("⚕️")
+    return f"{main.rstrip()}\n\n{_CHILD_NOTE}\n\n{sep}{footer}" if sep else f"{out}\n\n{_CHILD_NOTE}"
 
 
 # ── Generation ────────────────────────────────────────────────────────────────
-async def _generate(query: str, chunks: list[Chunk], history: list[dict]) -> str:
+async def _generate(query: str, chunks: list[Chunk], history: list[dict], ctx_text: str = "") -> str:
     """Try OpenAI; fall back to MockGenerator if key absent or on error."""
     from app.config import settings
 
     api_key = getattr(settings, "openai_api_key", "")
     if api_key:
         try:
+            q = f"{query}\n\n[Guided interview] {ctx_text}" if ctx_text else query
             return await _openai_generate(
-                query, chunks, history, api_key, getattr(settings, "openai_model", "gpt-4o-mini")
+                q, chunks, history, api_key, getattr(settings, "openai_model", "gpt-4o-mini")
             )
         except Exception:
             logger.exception("pipeline: OpenAI call failed, falling back to mock")

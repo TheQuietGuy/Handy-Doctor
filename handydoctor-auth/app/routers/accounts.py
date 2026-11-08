@@ -125,7 +125,7 @@ _REFRESH_COOKIE = "hd_refresh_token"
 _COOKIE_KWARGS = {
     "key": _REFRESH_COOKIE,
     "httponly": True,
-    "secure": True,  # HTTPS only in production
+    "secure": settings.cookie_secure,  # set COOKIE_SECURE=false only for http://localhost dev
     "samesite": "lax",
     "path": "/api/accounts/token/refresh",
 }
@@ -439,18 +439,22 @@ async def oauth_google_initiate(
     return RedirectResponse(url, status_code=302)
 
 
-@router.get("/oauth/google/callback", response_model=TokenPair)
+@router.get("/oauth/google/callback")
 async def oauth_google_callback(
     code: str,
     state: str,
-    response: Response,
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
-) -> TokenPair:
+) -> RedirectResponse:
+    """
+    Google redirects the browser here.  We set the refresh cookie and send the
+    browser back to the SPA, which restores the session via /token/refresh.
+    """
+    front = settings.frontend_url.rstrip("/")
     try:
         info = await exchange_google_code(redis, code, state)
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    except ValueError:
+        return RedirectResponse(f"{front}/#oauth-error", status_code=status.HTTP_303_SEE_OTHER)
 
     email = info.email.lower()
 
@@ -484,7 +488,9 @@ async def oauth_google_callback(
             user.avatar_url = info.avatar_url
 
     user.last_login_at = datetime.now(UTC)
-    return await _issue_token_pair(db, response, user)
+    redirect = RedirectResponse(f"{front}/#signed-in", status_code=status.HTTP_303_SEE_OTHER)
+    await _issue_token_pair(db, redirect, user)
+    return redirect
 
 
 # ════════════════════════════════════════════════════════════════════════════

@@ -53,6 +53,9 @@ ROUTE_POLICIES: list[tuple[str, RatePolicy]] = [
     ("/api/accounts/oauth", RatePolicy(20, 900, "auth_standard")),
     # Chat — message sending limited to prevent API abuse
     ("/api/chat/sessions", RatePolicy(60, 60, "chat")),
+    ("/api/chat/messages", RatePolicy(60, 60, "chat")),
+    ("/api/chat/interview", RatePolicy(60, 60, "chat")),
+    ("/api/journal", RatePolicy(120, 60, "journal")),
 
     # Admin — generous since it's a trusted, small user base, but still bounded
     ("/api/admin", RatePolicy(120, 60, "admin")),

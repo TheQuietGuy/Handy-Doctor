@@ -132,6 +132,13 @@ jobs:
             --cov-fail-under=70 \
             -v
 
+      - name: Triage safety benchmark (fails on any missed emergency)
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+        run: |
+          python -m benchmark.run > benchmark-results.md
+          cat benchmark-results.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:

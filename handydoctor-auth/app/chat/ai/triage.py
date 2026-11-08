@@ -43,6 +43,10 @@ _EMERGENCY_TERMS: list[str] = [
     "suicidal",
     "want to die",
     "kill myself",
+    "end my life",
+    "take my own life",
+    "suicide",
+    "hurt myself",
 ]
 
 # ── Response content indicators ───────────────────────────────────────────────
@@ -65,7 +69,7 @@ _AMBER_PATTERNS: list[str] = [
     r"gp.*appointment",
     r"urgent care centre",
     r"walk.in centre",
-    r"within.*day",
+    r"(gp|doctor|seen|appointment|contact).{0,40}within \d+ ?(hours|days)",
     r"same.day",
     r"soon as possible",
     r"nhs 111",
@@ -85,12 +89,28 @@ def classify_query(query: str) -> str | None:
     return None
 
 
+_CONDITIONAL = re.compile(
+    r"\b(if|unless|in case|should you|when to|whenever|any of these|warning signs?"
+    r"|may (indicate|be a sign|suggest)|can (indicate|be a sign)|signs? of)\b"
+)
+
+
+def _directive_sentences(text: str) -> list[str]:
+    """
+    Sentences that tell the user what to do NOW.  Safety-netting such as
+    "call 999 if you develop a rash" appears in almost every answer and must
+    not, on its own, turn a cold into an emergency.
+    """
+    parts = re.split(r"(?<=[.!?])\s+|\n+", text)
+    return [p for p in parts if p.strip() and not _CONDITIONAL.search(p)]
+
+
 def classify_response(content: str) -> str:
     """
-    Derive a severity from the generated response text.
-    Falls back to 'green' (self-care) if no signals found.
+    Derive a severity from the generated response text, ignoring conditional
+    safety-netting sentences. Falls back to 'green' (self-care).
     """
-    lower = content.lower()
+    lower = " ".join(_directive_sentences(content.lower()))
     if any(re.search(p, lower) for p in _RED_PATTERNS):
         return "red"
     if any(re.search(p, lower) for p in _AMBER_PATTERNS):

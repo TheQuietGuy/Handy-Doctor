@@ -138,7 +138,7 @@ async def send_password_reset_email(to: str, full_name: str, token: str) -> None
 
 
 async def send_deletion_confirmation_email(to: str, full_name: str, execute_after: str) -> None:
-    cancel_link = f"{settings.frontend_url}/#account-settings&tab=danger"
+    cancel_link = f"{settings.frontend_url}/#/profile"
     body = f"""
     <p>Hi {full_name},</p>
     <p>We've received a request to permanently delete your HandyDoctor account and all

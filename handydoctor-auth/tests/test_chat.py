@@ -528,3 +528,20 @@ class TestChatRouter:
             f"/api/chat/sessions/{sess_id}/messages", json={"content": ""}, headers=hdrs
         )
         assert resp.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I feel hopeless and want to end my life",
+        "I think I would be better off dead",
+        "I keep thinking about suicide",
+        "I want to hurt myself",
+    ],
+)
+async def test_crisis_phrases_short_circuit(text):
+    from app.chat.ai.pipeline import run_pipeline
+
+    result = await run_pipeline(text, [])
+    assert result.severity == "red"
+    assert result.is_emergency is True

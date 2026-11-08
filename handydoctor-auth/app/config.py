@@ -48,12 +48,13 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"
     allowed_origins: str = "http://localhost:3000"
     trust_proxy: bool = False
+    cookie_secure: bool = True  # refresh cookie Secure flag; false only for plain-http local dev
 
     # ── Rate-limit constants ──────────────────────────────────────────────
     login_max_attempts: int = 5
     login_lockout_minutes: int = 15
+    openai_api_key: str = ""  # set to enable real answers; blank = deterministic mock
     openai_model: str = "gpt-4o-mini"
-    login_lockout_minutes: int = 15
 
     @property
     def jwt_private_key(self) -> str:

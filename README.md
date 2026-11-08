@@ -216,6 +216,35 @@ All endpoints require `is_superuser = True`. Protected by the `get_admin_user` F
 
 Admins cannot modify their own `is_active` or `is_superuser` through the API — this prevents accidental lockout.
 
+### Safety layer: interview, red-flag rules and five care levels
+
+HandyDoctor doesn't answer the first message straight away. A short guided interview (`POST /api/chat/interview`) asks who it's for, their age, how long, how bad, and up to five yes/no warning-sign questions chosen from the complaint (child-specific questions for under-12s, wording switched to "they" for someone else). If the first message already contains emergency signs, the interview is skipped.
+
+Deterministic red-flag rules (`app/chat/ai/redflags.py`, each citing an NHS page) then set a **minimum** care level from the text and answers. The language model can raise that level but never lower it, and a "no" answer never lowers anything. Every answer carries:
+
+* `care_level`: `self_care`, `pharmacy`, `gp`, `urgent` or `emergency` (the old green/amber/red `severity` is still returned);
+* `reasons`: the rule hits that set the level, shown in the UI as "Why this level?".
+
+Answers about children have adult doses removed. Follow-up check-ins (`POST /api/chat/sessions/{id}/checkin` with `better`/`same`/`worse` and an optional 1–10 score) re-triage and log the score to the journal; follow-up emails link straight to them.
+
+### Triage benchmark (`benchmark/`)
+
+`python -m benchmark.run` runs 45 written vignettes (15 emergency, 15 GP or same-day, 15 pharmacy or self-care) through the full pipeline and reports exact accuracy, under-triage and over-triage. CI runs it on every push and **fails the build if any emergency is missed**. Latest offline results: see [`benchmark/RESULTS.md`](benchmark/RESULTS.md). The vignettes are not clinically validated; see [`docs/CLINICAL_SAFETY.md`](docs/CLINICAL_SAFETY.md) and [`docs/REGULATORY.md`](docs/REGULATORY.md).
+
+### Symptom journal (`app/journal/`)
+
+Users log a symptom with a 1–10 severity, optional notes and a time. `GET /api/journal/summary` returns per-symptom stats with a trend (`improving` / `worsening` / `steady`, comparing the earlier and later halves of the readings) plus a daily average series for charting. Entries are included in the GDPR export and cascade-deleted with the account.
+
+### Answer feedback
+
+`POST /api/chat/messages/{id}/feedback` with `{"rating": "up" | "down" | null}` rates an assistant answer. Counts appear in `GET /api/admin/stats` as `answer_feedback`, which is a quick signal for retrieval and prompt quality.
+
+### Frontend (`handydoc_frontend.html`)
+
+A single-file SPA (no build step) with Apple-style translucent chrome, spring-driven sheets you can drag to dismiss, and the vector logo (`handydoc_logo.svg`) inlined once as an SVG symbol. Features: live triage demo, symptom check with voice input and read-aloud, answer ratings, printable GP summary, symptom journal with trend chart and a draggable severity slider, **Care nearby** (OpenStreetMap / Overpass for A&E, hospitals, pharmacies and GPs, plus UK postcode search via postcodes.io), past checks with search, profile and privacy controls, light/dark/system theme, and an admin dashboard for superusers. It respects reduced-motion, reduced-transparency and increased-contrast settings.
+
+Serve it from any static server (e.g. `python3 -m http.server 3000`). From ports 3000/5500/5173/8080 or `file://` it calls `http://localhost:8000`; otherwise it calls its own origin (nginx in production). Override with `window.HD_API_BASE`.
+
 ---
 
 ## Configuration reference
@@ -396,6 +425,15 @@ GET    /api/chat/sessions/{id}
 POST   /api/chat/sessions/{id}/messages
 DELETE /api/chat/sessions/{id}
 GET    /api/chat/sessions/{id}/export
+POST   /api/chat/messages/{id}/feedback
+POST   /api/chat/interview
+POST   /api/chat/sessions/{id}/checkin
+
+GET    /api/journal?days=30&symptom=
+POST   /api/journal
+PATCH  /api/journal/{id}
+DELETE /api/journal/{id}
+GET    /api/journal/summary?days=30
 
 GET    /api/admin/stats
 GET    /api/admin/users

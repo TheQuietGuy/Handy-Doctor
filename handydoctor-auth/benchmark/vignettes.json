@@ -1,0 +1,540 @@
+{
+ "version": 1,
+ "description": "HandyDoctor triage vignettes. Written by the HandyDoctor team from NHS condition pages; NOT clinically validated. Expected levels: self_care, pharmacy, gp, urgent, emergency.",
+ "vignettes": [
+  {
+   "id": "E01",
+   "expected": "emergency",
+   "text": "Crushing pain in the middle of my chest for 20 minutes, spreading to my left arm",
+   "context": {
+    "who": "me",
+    "age_years": 58,
+    "duration": "today",
+    "severity": "severe",
+    "red_flags": {
+     "chest_spread": true,
+     "sweaty_breathless": true
+    }
+   }
+  },
+  {
+   "id": "E02",
+   "expected": "emergency",
+   "text": "My dad's face has dropped on one side and he can't lift his right arm",
+   "context": {
+    "who": "other",
+    "age_years": 72,
+    "duration": "today"
+   }
+  },
+  {
+   "id": "E03",
+   "expected": "emergency",
+   "text": "My lips and tongue are swelling after eating a cashew and my throat feels tight",
+   "context": {
+    "who": "me",
+    "age_years": 24,
+    "duration": "today",
+    "severity": "severe"
+   }
+  },
+  {
+   "id": "E04",
+   "expected": "emergency",
+   "text": "My 2 year old has a fever and a rash that doesn't fade when I press a glass on it",
+   "context": {
+    "who": "child",
+    "age_years": 2,
+    "duration": "today"
+   }
+  },
+  {
+   "id": "E05",
+   "expected": "emergency",
+   "text": "Sudden headache, the worst I've ever had, came on while lifting weights",
+   "context": {
+    "who": "me",
+    "age_years": 45,
+    "duration": "today",
+    "severity": "severe",
+    "red_flags": {
+     "sudden_severe": true
+    }
+   }
+  },
+  {
+   "id": "E06",
+   "expected": "emergency",
+   "text": "Headache and fever since last night, and now my neck is stiff and light hurts my eyes",
+   "context": {
+    "who": "me",
+    "age_years": 19,
+    "duration": "today",
+    "red_flags": {
+     "stiff_neck": true
+    }
+   }
+  },
+  {
+   "id": "E07",
+   "expected": "emergency",
+   "text": "My friend collapsed and isn't responding",
+   "context": {
+    "who": "other",
+    "age_years": 30,
+    "duration": "today"
+   }
+  },
+  {
+   "id": "E08",
+   "expected": "emergency",
+   "text": "I've been vomiting blood this morning",
+   "context": {
+    "who": "me",
+    "age_years": 50,
+    "duration": "today"
+   }
+  },
+  {
+   "id": "E09",
+   "expected": "emergency",
+   "text": "I fell off my bike and hit my head, now I keep vomiting and feel drowsy",
+   "context": {
+    "who": "me",
+    "age_years": 16,
+    "duration": "today",
+    "red_flags": {
+     "head_injury": true
+    }
+   }
+  },
+  {
+   "id": "E10",
+   "expected": "emergency",
+   "text": "I suddenly can't see out of my right eye",
+   "context": {
+    "who": "me",
+    "age_years": 66,
+    "duration": "today"
+   }
+  },
+  {
+   "id": "E11",
+   "expected": "emergency",
+   "text": "Sudden severe pain in my left testicle that started an hour ago",
+   "context": {
+    "who": "me",
+    "age_years": 15,
+    "duration": "today",
+    "severity": "severe"
+   }
+  },
+  {
+   "id": "E12",
+   "expected": "emergency",
+   "text": "My baby is floppy and hard to wake, and her skin looks mottled",
+   "context": {
+    "who": "child",
+    "age_years": 0.5,
+    "duration": "today",
+    "red_flags": {
+     "child_drowsy": true
+    }
+   }
+  },
+  {
+   "id": "E13",
+   "expected": "emergency",
+   "text": "I'm struggling to breathe and my lips look blue",
+   "context": {
+    "who": "me",
+    "age_years": 70,
+    "duration": "today",
+    "red_flags": {
+     "blue_lips": true
+    }
+   }
+  },
+  {
+   "id": "E14",
+   "expected": "emergency",
+   "text": "Lower back pain for a week, and since this morning numbness around my bottom",
+   "context": {
+    "who": "me",
+    "age_years": 41,
+    "duration": "4_7_days",
+    "red_flags": {
+     "numb_legs": true
+    }
+   },
+   "note": "Only detectable through the interview question"
+  },
+  {
+   "id": "E15",
+   "expected": "emergency",
+   "text": "I feel hopeless and I've been thinking about ending my life",
+   "context": {
+    "who": "me",
+    "age_years": 28,
+    "duration": "today"
+   }
+  },
+  {
+   "id": "U01",
+   "expected": "urgent",
+   "text": "Pain started around my belly button and has moved to the lower right side, I feel sick",
+   "context": {
+    "who": "me",
+    "age_years": 22,
+    "duration": "today",
+    "severity": "moderate",
+    "red_flags": {
+     "lower_right": true
+    }
+   }
+  },
+  {
+   "id": "U02",
+   "expected": "urgent",
+   "text": "Burning when I pee, pain in my back and I'm shivery with a temperature",
+   "context": {
+    "who": "me",
+    "age_years": 34,
+    "duration": "1_3_days",
+    "red_flags": {
+     "back_pain_fever": true
+    }
+   }
+  },
+  {
+   "id": "U03",
+   "expected": "urgent",
+   "text": "I'm 10 weeks pregnant and have some bleeding",
+   "context": {
+    "who": "me",
+    "age_years": 30,
+    "duration": "today",
+    "red_flags": {
+     "pregnant": true
+    }
+   }
+  },
+  {
+   "id": "U04",
+   "expected": "urgent",
+   "text": "My 1 year old has had diarrhoea and hasn't had a wet nappy since this morning",
+   "context": {
+    "who": "child",
+    "age_years": 1,
+    "duration": "today",
+    "red_flags": {
+     "child_fluids": true
+    }
+   }
+  },
+  {
+   "id": "U05",
+   "expected": "urgent",
+   "text": "My eye is red and very painful and my vision is blurred",
+   "context": {
+    "who": "me",
+    "age_years": 45,
+    "duration": "today",
+    "red_flags": {
+     "vision": true
+    }
+   }
+  },
+  {
+   "id": "U06",
+   "expected": "urgent",
+   "text": "A cut on my leg is red, hot and the redness is spreading",
+   "context": {
+    "who": "me",
+    "age_years": 52,
+    "duration": "1_3_days",
+    "red_flags": {
+     "rash_spreading": true
+    }
+   }
+  },
+  {
+   "id": "U07",
+   "expected": "urgent",
+   "text": "My 6 week old baby has a temperature of 38.2",
+   "context": {
+    "who": "child",
+    "age_years": 0.12,
+    "duration": "today",
+    "red_flags": {
+     "fever": true
+    }
+   }
+  },
+  {
+   "id": "U08",
+   "expected": "urgent",
+   "text": "Tummy pain and I haven't been able to keep any fluids down since yesterday",
+   "context": {
+    "who": "me",
+    "age_years": 27,
+    "duration": "1_3_days",
+    "red_flags": {
+     "cant_keep_fluids": true
+    }
+   }
+  },
+  {
+   "id": "U09",
+   "expected": "urgent",
+   "text": "Cough with a fever, I feel very unwell and a bit confused",
+   "context": {
+    "who": "me",
+    "age_years": 79,
+    "duration": "1_3_days",
+    "red_flags": {
+     "fever": true,
+     "very_unwell": true
+    }
+   }
+  },
+  {
+   "id": "G01",
+   "expected": "gp",
+   "text": "I've had a cough for 4 weeks",
+   "context": {
+    "who": "me",
+    "age_years": 48,
+    "duration": "over_3_weeks",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "G02",
+   "expected": "gp",
+   "text": "I noticed blood in my urine yesterday, no pain",
+   "context": {
+    "who": "me",
+    "age_years": 61,
+    "duration": "1_3_days",
+    "red_flags": {
+     "blood_pee": true
+    }
+   }
+  },
+  {
+   "id": "G03",
+   "expected": "gp",
+   "text": "I've lost a stone without trying over the last two months",
+   "context": {
+    "who": "me",
+    "age_years": 55,
+    "duration": "over_3_weeks"
+   }
+  },
+  {
+   "id": "G04",
+   "expected": "gp",
+   "text": "I found a lump in my breast",
+   "context": {
+    "who": "me",
+    "age_years": 39,
+    "duration": "1_3_days"
+   }
+  },
+  {
+   "id": "G05",
+   "expected": "gp",
+   "text": "Heartburn most days for the last month",
+   "context": {
+    "who": "me",
+    "age_years": 50,
+    "duration": "over_3_weeks",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "G06",
+   "expected": "gp",
+   "text": "My knee has been painful and swollen for two weeks",
+   "context": {
+    "who": "me",
+    "age_years": 44,
+    "duration": "1_3_weeks",
+    "severity": "moderate"
+   }
+  },
+  {
+   "id": "P01",
+   "expected": "pharmacy",
+   "text": "Sore throat for two days, I can still eat and drink",
+   "context": {
+    "who": "me",
+    "age_years": 25,
+    "duration": "1_3_days",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "P02",
+   "expected": "pharmacy",
+   "text": "Blocked nose and pain around my cheeks, I think it's my sinuses",
+   "context": {
+    "who": "me",
+    "age_years": 33,
+    "duration": "4_7_days",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "P03",
+   "expected": "pharmacy",
+   "text": "My 6 year old has had earache since yesterday",
+   "context": {
+    "who": "child",
+    "age_years": 6,
+    "duration": "1_3_days",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "P04",
+   "expected": "pharmacy",
+   "text": "An insect bite on my arm is a bit swollen and itchy",
+   "context": {
+    "who": "me",
+    "age_years": 30,
+    "duration": "1_3_days",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "P05",
+   "expected": "pharmacy",
+   "text": "Stinging when I pee and needing to go more often",
+   "context": {
+    "who": "me",
+    "age_years": 28,
+    "duration": "1_3_days",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "P06",
+   "expected": "pharmacy",
+   "text": "I've got a cold sore on my lip",
+   "context": {
+    "who": "me",
+    "age_years": 22,
+    "duration": "1_3_days",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "S01",
+   "expected": "self_care",
+   "text": "Runny nose and sneezing for two days",
+   "context": {
+    "who": "me",
+    "age_years": 30,
+    "duration": "1_3_days",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "S02",
+   "expected": "self_care",
+   "text": "Mild headache after a long day at the computer",
+   "context": {
+    "who": "me",
+    "age_years": 35,
+    "duration": "today",
+    "severity": "mild",
+    "red_flags": {
+     "sudden_severe": false,
+     "stiff_neck": false,
+     "fast_signs": false,
+     "head_injury": false,
+     "fever": false
+    }
+   }
+  },
+  {
+   "id": "S03",
+   "expected": "self_care",
+   "text": "Slightly upset stomach after a takeaway last night, feeling better now",
+   "context": {
+    "who": "me",
+    "age_years": 29,
+    "duration": "today",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "S04",
+   "expected": "self_care",
+   "text": "I've got a mild hangover",
+   "context": {
+    "who": "me",
+    "age_years": 23,
+    "duration": "today",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "S05",
+   "expected": "self_care",
+   "text": "Small paper cut on my finger",
+   "context": {
+    "who": "me",
+    "age_years": 40,
+    "duration": "today",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "S06",
+   "expected": "self_care",
+   "text": "Mild muscle ache in my legs after the gym yesterday",
+   "context": {
+    "who": "me",
+    "age_years": 31,
+    "duration": "today",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "S07",
+   "expected": "self_care",
+   "text": "Dry, slightly itchy skin on my hands since the weather got cold",
+   "context": {
+    "who": "me",
+    "age_years": 37,
+    "duration": "1_3_weeks",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "S08",
+   "expected": "self_care",
+   "text": "I've had hiccups for ten minutes",
+   "context": {
+    "who": "me",
+    "age_years": 26,
+    "duration": "today",
+    "severity": "mild"
+   }
+  },
+  {
+   "id": "S09",
+   "expected": "self_care",
+   "text": "A bit of a cough after a cold last week, it's getting better",
+   "context": {
+    "who": "me",
+    "age_years": 29,
+    "duration": "4_7_days",
+    "severity": "mild"
+   }
+  }
+ ]
+}

@@ -1,7 +1,7 @@
 """tests/test_admin.py -- tests for the admin router (/api/admin/*)."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -260,7 +260,7 @@ class TestUserManagementRead:
             target = await _make_user(db, email="deleting@example.com")
             db.add(AccountDeletion(
                 user_id=target.id,
-                execute_after=datetime.now(timezone.utc) + timedelta(days=14),
+                execute_after=datetime.now(UTC) + timedelta(days=14),
             ))
             await db.commit()
         token = await _login(client, "admin@example.com")
@@ -486,7 +486,7 @@ class TestDeletionQueueEndpoint:
             target = await _make_user(db, email="pendingdel@example.com")
             db.add(AccountDeletion(
                 user_id=target.id,
-                execute_after=datetime.now(timezone.utc) + timedelta(days=14),
+                execute_after=datetime.now(UTC) + timedelta(days=14),
             ))
             await db.commit()
         token = await _login(client, "admin@example.com")
@@ -502,8 +502,8 @@ class TestDeletionQueueEndpoint:
             target = await _make_user(db, email="cancelled@example.com")
             db.add(AccountDeletion(
                 user_id=target.id,
-                execute_after=datetime.now(timezone.utc) + timedelta(days=14),
-                cancelled_at=datetime.now(timezone.utc),
+                execute_after=datetime.now(UTC) + timedelta(days=14),
+                cancelled_at=datetime.now(UTC),
             ))
             await db.commit()
         token = await _login(client, "admin@example.com")
@@ -518,8 +518,8 @@ class TestDeletionQueueEndpoint:
             target = await _make_user(db, email="cancelled2@example.com")
             db.add(AccountDeletion(
                 user_id=target.id,
-                execute_after=datetime.now(timezone.utc) + timedelta(days=14),
-                cancelled_at=datetime.now(timezone.utc),
+                execute_after=datetime.now(UTC) + timedelta(days=14),
+                cancelled_at=datetime.now(UTC),
             ))
             await db.commit()
         token = await _login(client, "admin@example.com")

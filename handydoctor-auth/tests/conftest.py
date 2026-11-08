@@ -10,39 +10,50 @@ Fixes two environment issues:
    middleware doesn't error out during tests.
 """
 
-from pathlib import Path
+import os
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+# Allow the suite to run without a .env file
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+
 
 # ── 1. RSA keys ──────────────────────────────────────────────────────────────
 @pytest.fixture(scope="session", autouse=True)
-def rsa_keys():
+def rsa_keys(tmp_path_factory):
+    """
+    Generate a throwaway key pair in a temp folder and point settings at it.
+    Never touches private.pem / public.pem in the project root, so running the
+    tests can't overwrite or delete a developer's real keys.
+    """
+    import os
+
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    public_key = private_key.public_key()
-    root = Path(__file__).parent.parent
-    (root / "private.pem").write_bytes(
+    keydir = tmp_path_factory.mktemp("keys")
+    priv, pub = keydir / "private.pem", keydir / "public.pem"
+    priv.write_bytes(
         private_key.private_bytes(
             serialization.Encoding.PEM,
             serialization.PrivateFormat.TraditionalOpenSSL,
             serialization.NoEncryption(),
         )
     )
-    (root / "public.pem").write_bytes(
-        public_key.public_bytes(
+    pub.write_bytes(
+        private_key.public_key().public_bytes(
             serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
         )
     )
-    from app.config import get_settings
+    os.environ["JWT_PRIVATE_KEY_PATH"] = str(priv)
+    os.environ["JWT_PUBLIC_KEY_PATH"] = str(pub)
+    from app.config import get_settings, settings
 
+    settings.jwt_private_key_path = str(priv)
+    settings.jwt_public_key_path = str(pub)
     get_settings.cache_clear()
     yield
-    (root / "private.pem").unlink(missing_ok=True)
-    (root / "public.pem").unlink(missing_ok=True)
-    get_settings.cache_clear()
 
 
 # ── 2. bcrypt 72-byte self-test patch ────────────────────────────────────────

@@ -6,6 +6,49 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] — 2026-11-07
+
+### Added
+- **Guided interview** before the first answer: who it's for, age, duration, severity, and up to five red-flag questions chosen from the complaint (`POST /api/chat/interview`). Skipped automatically when emergency signs are already present.
+- **Red-flag rule engine** (`app/chat/ai/redflags.py`): ~30 NHS-derived rules plus interview answers set a minimum care level; the model can only raise it. Negation-aware.
+- **Five care levels** (self-care, pharmacist, GP, today, 999) with "Why this level?" reasons and a button that opens Care nearby pre-filtered (pharmacy / GP / A&E). Migration `0007` (with backfill).
+- **Follow-up check-ins** (`POST /api/chat/sessions/{id}/checkin`): better / same / worse re-triage, score logged to the journal; follow-up emails deep-link to it.
+- **Triage benchmark** (`benchmark/`): 45 vignettes, results in `benchmark/RESULTS.md`, CI step and a regression test that fail on any missed emergency.
+- **Child dose filter**: adult medicine doses are removed from answers about under-16s.
+- `docs/CLINICAL_SAFETY.md` (DCB0129-style hazard log) and `docs/REGULATORY.md` (MHRA positioning).
+
+### Motion
+- Spring-style, reduced-motion-aware animations: tab changes slide in the direction you moved; your message rises from the composer; the care-level meter fills step by step and the Call 999 button pulses twice on emergencies; "Why this level?" and FAQ panels spring open; interview questions and care results arrive in sequence; the journal chart draws itself and the average counts up; saved entries flash; admin numbers count up; the homepage escalation scale fills as you scroll to it.
+
+### Fixed
+- `OPENAI_API_KEY` was never read (missing `Settings` field), so real AI answers could not be enabled.
+- Crisis phrases like "ending my life" were missed.
+- The response classifier treated safety-netting ("call 999 if…") and "resolves within 7 days" as instructions, over-triaging most answers.
+- Email links pointed at old frontend routes.
+- Homepage demo named likely conditions and gave treatment advice; it now signposts only.
+
+---
+
+## [1.1.0] — 2026-11-07
+
+### Added
+- **Symptom journal** (`app/journal/`): create/edit/delete entries, filters, and a summary endpoint with per-symptom trends and a daily series. Migration `0006`.
+- **Answer feedback**: thumbs up/down on assistant answers (`POST /api/chat/messages/{id}/feedback`), surfaced in admin stats.
+- Admin stats now include `answer_feedback` and `journal_entries_last_7d`; GDPR export includes the journal.
+- `COOKIE_SECURE` setting so the refresh cookie works over plain-http local dev (Safari).
+- Redesigned frontend: Apple-style UI keeping the navy/gold palette, vector SVG logo, live triage demo, voice input, read-aloud, printable GP summary, journal with trend chart, Care nearby map (OpenStreetMap + postcodes.io), searchable history, theme switcher, admin dashboard, urgent-help sheet.
+- 12 new tests (233 total).
+
+### Changed
+- Google OAuth callback now redirects back to the app (`FRONTEND_URL/#signed-in`) instead of returning raw JSON.
+- nginx CSP/Permissions-Policy allow the map, postcode lookup and microphone.
+- Password hashing uses `bcrypt` directly (passlib removed); broader crisis-phrase detection.
+
+### Removed
+- Placeholder testimonials and made-up usage stats from the landing page.
+
+---
+
 ## [1.0.0] — 2026-05-23
 
 First production-ready release. All core components built, tested, and deployed.

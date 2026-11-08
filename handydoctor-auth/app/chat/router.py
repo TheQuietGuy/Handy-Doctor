@@ -24,10 +24,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_verified_user
 from app.chat import service
+from app.chat.ai.interview import plan as interview_plan
+from app.chat.models import ChatMessage, ChatSession, MessageRole
 from app.chat.schemas import (
     ChatMessageOut,
     ChatSessionDetailOut,
     ChatSessionOut,
+    CheckinRequest,
+    FeedbackOut,
+    FeedbackRequest,
+    InterviewOut,
+    InterviewRequest,
     SendMessageRequest,
     SendMessageResponse,
     SessionListResponse,
@@ -91,7 +98,8 @@ async def send_message(
     Send a user message.  The RAG pipeline runs synchronously and the
     AI reply is returned in the same response.
     """
-    result = await service.add_message(db, session_id, current_user.id, body.content)
+    ctx = body.context.model_dump(exclude_none=True) if body.context else None
+    result = await service.add_message(db, session_id, current_user.id, body.content, ctx)
     if result is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found.")
 
@@ -126,3 +134,57 @@ async def export_session(
     if export is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found.")
     return export
+
+
+@router.post("/messages/{message_id}/feedback", response_model=FeedbackOut)
+async def give_feedback(
+    message_id: uuid.UUID,
+    body: FeedbackRequest,
+    current_user: Annotated[User, Depends(get_verified_user)],
+    db: AsyncSession = Depends(get_db),
+) -> FeedbackOut:
+    """Rate an assistant answer (thumbs up / down) to help improve answer quality."""
+    msg = await db.get(ChatMessage, message_id)
+    if msg is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Message not found.")
+    session = await db.get(ChatSession, msg.session_id)
+    if session is None or session.user_id != current_user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Message not found.")
+    if msg.role != MessageRole.assistant:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Only assistant answers can be rated.")
+    msg.feedback = body.rating
+    msg.feedback_comment = (body.comment or None) if body.rating else None
+    await db.flush()
+    return FeedbackOut(message_id=msg.id, feedback=msg.feedback)
+
+
+@router.post("/interview", response_model=InterviewOut)
+async def interview(
+    body: InterviewRequest,
+    current_user: Annotated[User, Depends(get_verified_user)],
+) -> InterviewOut:
+    """
+    Questions to ask before the first answer, chosen from the complaint.
+    If the complaint already contains emergency signs, `emergency` is true and
+    the client should send the message straight away instead of asking.
+    """
+    return InterviewOut(**interview_plan(body.complaint, body.age_years, body.who))
+
+
+@router.post("/sessions/{session_id}/checkin", response_model=SendMessageResponse)
+async def checkin(
+    session_id: uuid.UUID,
+    body: CheckinRequest,
+    current_user: Annotated[User, Depends(get_verified_user)],
+    db: AsyncSession = Depends(get_db),
+) -> SendMessageResponse:
+    """Record how the user feels now (better / same / worse) and re-triage."""
+    result = await service.checkin(db, session_id, current_user.id, body.status, body.severity, body.note)
+    if result is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found.")
+    user_msg, assistant_msg = result
+    return SendMessageResponse(
+        user_message=ChatMessageOut.from_orm_with_citations(user_msg),
+        assistant_message=ChatMessageOut.from_orm_with_citations(assistant_msg),
+        session_id=session_id,
+    )

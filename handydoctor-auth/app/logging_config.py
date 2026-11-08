@@ -19,13 +19,13 @@ Each log record includes:
 
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import logging.config
 import os
 import sys
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -39,7 +39,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level":     record.levelname,
             "logger":    record.name,
             "message":   record.getMessage(),
@@ -83,7 +83,7 @@ _RESET = "\033[0m"
 class DevFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         colour = _LEVEL_COLOURS.get(record.levelname, "")
-        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%H:%M:%S")
+        ts = datetime.fromtimestamp(record.created, tz=UTC).strftime("%H:%M:%S")
         level = f"{colour}{record.levelname:<8}{_RESET}"
         logger_short = record.name.split(".")[-1]   # last component only
         msg = record.getMessage()
@@ -130,7 +130,6 @@ def configure_logging(log_level: str | None = None) -> None:
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("passlib").setLevel(logging.ERROR)
     logging.getLogger("apscheduler").setLevel(logging.INFO)
 
     if log_format == "json":
@@ -156,7 +155,6 @@ def _is_production() -> bool:
 
 
 # ── Request-ID context middleware ─────────────────────────────────────────────
-import contextvars
 
 _request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "request_id", default=None

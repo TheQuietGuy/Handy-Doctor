@@ -32,7 +32,7 @@ Design notes
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -41,14 +41,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import AuditEvent, AuditLog
 from app.auth.dependencies import get_admin_user
-from app.chat.models import ChatMessage, ChatSession, Severity
+from app.chat.models import ChatMessage, ChatSession
 from app.database import get_db
+from app.journal.models import SymptomEntry
 from app.models import AccountDeletion, User
 from app.notifications.models import NotificationLog, NotificationStatus
 from app.routers.admin_schemas import (
     AdminAuditLogOut,
     AdminDeletionQueueOut,
     AdminNotificationLogOut,
+    AdminUserListOut,
     AdminUserOut,
     AuditLogListOut,
     DeletionQueueListOut,
@@ -57,7 +59,6 @@ from app.routers.admin_schemas import (
     SetSuperuserRequest,
     SetUserActiveRequest,
     SystemStatsOut,
-    AdminUserListOut,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -71,7 +72,7 @@ async def get_system_stats(
     _admin: Annotated[User, Depends(get_admin_user)],
     db: AsyncSession = Depends(get_db),
 ) -> SystemStatsOut:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     last_24h = now - timedelta(hours=24)
     last_7d = now - timedelta(days=7)
 
@@ -145,7 +146,27 @@ async def get_system_stats(
     for key in ("green", "amber", "red"):
         sev_breakdown.setdefault(key, 0)
 
+    fb_rows = (
+        await db.execute(
+            select(ChatMessage.feedback, func.count())
+            .where(ChatMessage.feedback.is_not(None))
+            .group_by(ChatMessage.feedback)
+        )
+    ).all()
+    feedback = {str(k): v for k, v in fb_rows}
+    for key in ("up", "down"):
+        feedback.setdefault(key, 0)
+    journal_7d = (
+        await db.execute(
+            select(func.count())
+            .select_from(SymptomEntry)
+            .where(SymptomEntry.recorded_at >= last_7d)
+        )
+    ).scalar_one()
+
     return SystemStatsOut(
+        answer_feedback=feedback,
+        journal_entries_last_7d=journal_7d,
         total_users=total_users,
         active_users=active_users,
         verified_users=verified_users,

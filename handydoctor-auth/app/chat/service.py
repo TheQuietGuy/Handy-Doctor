@@ -97,6 +97,7 @@ async def add_message(
     session_id: uuid.UUID,
     user_id: uuid.UUID,
     content: str,
+    context: dict | None = None,
 ) -> tuple[ChatMessage, ChatMessage] | None:
     """
     Persist the user message, run the RAG pipeline, persist the AI reply.
@@ -112,6 +113,7 @@ async def add_message(
         session_id=session_id,
         role=MessageRole.user,
         content=content,
+        context=json.dumps(context) if context else None,
     )
     db.add(user_msg)
     await db.flush()
@@ -119,6 +121,13 @@ async def add_message(
     # Auto-title on the first user message
     if session.message_count == 0:
         session.title = _auto_title(content)
+
+    # Interview answers from earlier in this check still apply to follow-ups
+    if context is None:
+        for m in session.messages:
+            if m.role == MessageRole.user and m.context:
+                context = json.loads(m.context)
+                break
 
     # ── Build history for the LLM ────────────────────────────────────────
     history = [
@@ -132,6 +141,7 @@ async def add_message(
         query=content,
         history=history,
         retriever=MockRetriever(),  # swap for ChromaRetriever() when ready
+        context=context,
     )
 
     # ── Assistant message ────────────────────────────────────────────────
@@ -142,6 +152,8 @@ async def add_message(
         content=ai_response.content,
         severity=Severity(ai_response.severity),
         citations=citations_json,
+        care_level=ai_response.care_level,
+        triage_reasons=json.dumps(ai_response.reasons),
     )
     db.add(assistant_msg)
 
@@ -149,6 +161,90 @@ async def add_message(
     session.message_count += 2  # user + assistant
     session.updated_at = datetime.now(UTC)
 
+    await db.flush()
+    return user_msg, assistant_msg
+
+
+# ── Follow-up check-in ────────────────────────────────────────────────────────
+_CHECKIN_TEXT = {
+    "better": "Good to hear you're feeling better. Keep following the self-care advice, and finish any "
+              "treatment you've been given.",
+    "same": "Thanks for checking in. As things haven't improved, it's worth getting some advice.",
+    "worse": "Thanks for letting us know. Because your symptoms are getting worse, please get help sooner "
+             "than we suggested before.",
+}
+
+
+async def checkin(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    user_id: uuid.UUID,
+    status: str,
+    severity: int | None = None,
+    note: str | None = None,
+) -> tuple[ChatMessage, ChatMessage] | None:
+    """
+    Record a "how are you now?" check-in and re-triage.
+
+    * better -> stays at the rule floor for anything new in the note
+    * same   -> one level up (self-care -> pharmacist -> GP), never below the previous level
+    * worse  -> one level up from the previous advice, and at least "contact your GP"
+    Red-flag rules over the note can raise it further.  A severity score is also
+    written to the symptom journal so the trend chart reflects it.
+    """
+    from app.chat.ai import care
+    from app.chat.ai.redflags import evaluate
+    from app.journal.models import SymptomEntry
+
+    session = await get_session(db, session_id, user_id, with_messages=True)
+    if session is None:
+        return None
+
+    prev = "self_care"
+    for m in reversed(session.messages):
+        if m.role == MessageRole.assistant:
+            prev = m.care_level or {"green": "self_care", "amber": "gp", "red": "emergency"}.get(
+                m.severity.value if m.severity else "green", "self_care")
+            break
+
+    rules = evaluate(note or "")
+    if status == "better":
+        level = rules.level
+    elif status == "same":
+        level = care.highest(prev, care.raise_by(prev) if care.rank(prev) < care.rank("gp") else prev)
+    else:
+        level = care.highest(care.raise_by(prev), "gp")
+    level = care.highest(level, rules.level)
+    lv = care.LEVELS[level]
+
+    label = {"better": "Feeling better", "same": "About the same", "worse": "Feeling worse"}[status]
+    user_text = f"Check-in: {label}" + (f" ({severity}/10)" if severity else "") + (f". {note.strip()}" if note else "")
+    reasons = list(rules.reasons)
+    if status != "better":
+        reasons.insert(0, {"id": "checkin", "level": level, "source": "HandyDoctor follow-up rule",
+                           "reason": f"You said you're {label.lower()} since your last check."})
+    body = f"**{lv.label}.** {_CHECKIN_TEXT[status]} {lv.action}"
+    if status == "better":
+        body += "\n\nIf anything new or worrying starts, do another check or call NHS 111."
+    body += "\n\n⚕️ This is not a substitute for professional medical advice."
+
+    user_msg = ChatMessage(session_id=session_id, role=MessageRole.user, content=user_text)
+    db.add(user_msg)
+    await db.flush()
+    assistant_msg = ChatMessage(
+        session_id=session_id, role=MessageRole.assistant, content=body,
+        severity=Severity(lv.severity), citations="[]", care_level=level,
+        triage_reasons=json.dumps(reasons),
+    )
+    db.add(assistant_msg)
+    if severity:
+        db.add(SymptomEntry(
+            user_id=user_id, symptom=(session.title or "Symptoms")[:120], severity=severity,
+            notes=f"Check-in: {label.lower()}" + (f". {note.strip()}" if note else ""),
+            recorded_at=datetime.now(UTC),
+        ))
+    session.message_count += 2
+    session.updated_at = datetime.now(UTC)
     await db.flush()
     return user_msg, assistant_msg
 
@@ -177,6 +273,7 @@ async def export_session_json(
                 "role": m.role.value,
                 "content": m.content,
                 "severity": m.severity,
+                "care_level": m.care_level,
                 "citations": json.loads(m.citations or "[]"),
                 "created_at": m.created_at.isoformat(),
             }

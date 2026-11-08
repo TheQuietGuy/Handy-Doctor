@@ -90,6 +90,16 @@ class ChatMessage(Base):
     severity: Mapped[Severity | None] = mapped_column(Enum(Severity), nullable=True)
     citations: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
 
+    # Five-level care scale + the rule hits that set it (JSON list)
+    care_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    triage_reasons: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Guided-interview answers sent with a user message (JSON)
+    context: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # User feedback on assistant answers: 'up' | 'down' | NULL
+    feedback: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    feedback_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )

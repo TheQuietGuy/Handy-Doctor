@@ -32,6 +32,8 @@ class SystemStatsOut(BaseModel):
     messages_last_24h: int
     notification_logs_last_24h: dict[str, int]   # {"sent": n, "failed": n, "skipped": n}
     severity_breakdown_last_7d: dict[str, int]   # {"green": n, "amber": n, "red": n}
+    answer_feedback: dict[str, int] = {}         # {"up": n, "down": n}
+    journal_entries_last_7d: int = 0
 
 
 # ── User management ───────────────────────────────────────────────────────────

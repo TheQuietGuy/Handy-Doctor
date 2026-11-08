@@ -91,7 +91,7 @@ p{{margin:0 0 14px;color:#475569;font-size:.88rem}}
 Always consult a qualified clinician.<br>
 <a href="{frontend_url}" style="color:#D4A017">handydoctor.app</a>
 &nbsp;·&nbsp;
-<a href="{frontend_url}/#account-settings&tab=notifications" style="color:#94A3B8">Manage notifications</a>
+<a href="{frontend_url}/#/profile" style="color:#94A3B8">Manage notifications</a>
 </div></div></body></html>"""
 
 
@@ -134,8 +134,8 @@ def build_session_summary(
 <span class="sev" style="background:{badge_bg};color:{badge_colour}">{badge_text}</span>
 {cards_html}{cit_html}
 <p style="margin-top:18px">If symptoms change or worsen, seek professional advice promptly.</p>
-<a class="btn" href="{frontend_url}/#past">View full consultation</a>
-&nbsp;<a href="{frontend_url}/#chat" style="font-size:.82rem;color:#D4A017;text-decoration:none">New chat →</a>"""
+<a class="btn" href="{frontend_url}/#/history">View full consultation</a>
+&nbsp;<a href="{frontend_url}/#/chat" style="font-size:.82rem;color:#D4A017;text-decoration:none">New chat →</a>"""
 
     plain = (
         f"HandyDoctor Consultation Summary\n{'=' * 40}\n\nSession: {session.title}\n"
@@ -146,7 +146,7 @@ def build_session_summary(
             if citations
             else ""
         )
-        + f"\n\nView consultation: {frontend_url}/#past\n"
+        + f"\n\nView consultation: {frontend_url}/#/history\n"
         + "\nNot a substitute for professional medical advice.\n"
     )
 
@@ -175,13 +175,13 @@ def build_followup_reminder(
             "Your previous consultation recommended seeing a GP soon. "
             "If you haven't already, please book an appointment."
         )
-        cta_label, cta_url = "Find nearby care", f"{frontend_url}/#hospitals"
+        cta_label, cta_url = "Find nearby care", f"{frontend_url}/#/care"
     else:
         urgency = (
             "Your previous consultation recommended self-care. "
             "If symptoms haven't improved or worsened, it's time to see a GP."
         )
-        cta_label, cta_url = "New consultation", f"{frontend_url}/#chat"
+        cta_label, cta_url = "New consultation", f"{frontend_url}/#/chat"
 
     body = f"""<h2>Following up on your recent consultation</h2>
 <p>Hi {first_name},</p>
@@ -192,8 +192,9 @@ def build_followup_reminder(
 <p>{excerpt}</p></div>
 <p>{urgency}</p>
 <p>If you have new or worsening symptoms, start a new consultation for updated guidance.</p>
-<a class="btn" href="{cta_url}">{cta_label}</a>
-&nbsp;<a href="{frontend_url}/#chat" style="font-size:.82rem;color:#D4A017;text-decoration:none">New consultation →</a>
+<a class="btn" href="{frontend_url}/#checkin&session={session.id}">Tell us how you are now</a>
+&nbsp;<a href="{cta_url}" style="font-size:.82rem;color:#D4A017;text-decoration:none">{cta_label}</a>
+<p style="margin-top:10px;font-size:.78rem;color:#94A3B8">One tap (better, the same or worse) and we'll update the advice.</p>
 <p style="margin-top:18px;font-size:.78rem;color:#94A3B8">
 In an emergency call 999. For urgent non-emergency advice call NHS 111.</p>"""
 
@@ -202,8 +203,9 @@ In an emergency call 999. For urgent non-emergency advice call NHS 111.</p>"""
         f"It's been {hours_since} hours since: {session.title}\n\n"
         f"Original advice: {badge_text}\n{excerpt}\n\n"
         f"{urgency}\n\n"
-        f"New consultation: {frontend_url}/#chat\n"
-        f"Find nearby care: {frontend_url}/#hospitals\n\n"
+        f"Tell us how you are now: {frontend_url}/#checkin&session={session.id}\n"
+        f"New consultation: {frontend_url}/#/chat\n"
+        f"Find nearby care: {frontend_url}/#/care\n\n"
         "Not a substitute for professional medical advice.\n"
     )
 

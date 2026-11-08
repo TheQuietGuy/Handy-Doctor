@@ -14,9 +14,10 @@ from app.chat.router import router as chat_router
 from app.config import settings
 from app.database import close_redis, engine, get_redis
 from app.gdpr.scheduler import create_scheduler, start_scheduler, stop_scheduler
+from app.journal.router import router as journal_router
+from app.logging_config import configure_logging
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.models import Base
-from app.logging_config import configure_logging
 from app.routers import accounts, admin
 
 
@@ -70,6 +71,7 @@ app.add_middleware(
 app.include_router(accounts.router)
 app.include_router(admin.router)
 app.include_router(chat_router)
+app.include_router(journal_router)
 
 
 @app.get("/health", tags=["health"])

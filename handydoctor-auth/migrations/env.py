@@ -55,6 +55,7 @@ from app.chat.models import (     # noqa: F401
     ChatMessage,
 )
 from app.notifications.models import NotificationLog  # noqa: F401
+from app.journal.models import SymptomEntry  # noqa: F401
 
 # ── Alembic Config object ─────────────────────────────────────────────────────
 config = context.config

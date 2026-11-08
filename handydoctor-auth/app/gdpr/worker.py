@@ -243,7 +243,30 @@ async def _build_export_payload(db: AsyncSession, user: User) -> dict:
     )
     audit_rows = audit_result.scalars().all()
 
+    from app.journal.models import SymptomEntry
+
+    journal_rows = (
+        (
+            await db.execute(
+                select(SymptomEntry)
+                .where(SymptomEntry.user_id == user.id)
+                .order_by(SymptomEntry.recorded_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
     return {
+        "symptom_journal": [
+            {
+                "symptom": j.symptom,
+                "severity": j.severity,
+                "notes": j.notes,
+                "recorded_at": j.recorded_at.isoformat(),
+            }
+            for j in journal_rows
+        ],
         "export_generated_at": datetime.now(UTC).isoformat(),
         "export_format_version": "1.0",
         "data_controller": "HandyDoctor Ltd",
