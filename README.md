@@ -468,9 +468,9 @@ See [LICENSE](./LICENSE) for the full medical disclaimer.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, coding conventions, and the PR process.
 
-## Live demonstation
+## Live demonstration
 
-Will be done soon when I get time
+YouTube Link: https://youtu.be/iekDA54q5Gw
 
 ## License
 
